@@ -1,0 +1,11 @@
+---
+# vars file for workers-bootstrap
+kubernetesVersion: v1.21.0
+
+runcVersion: v1.0.0-rc93
+
+crictlVersion: v1.21.0
+
+cniPluginsVerion: v0.9.1
+
+containerdVersion: 1.4.4

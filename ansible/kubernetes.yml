@@ -1,0 +1,35 @@
+---
+- name: install CFSSL and Kubectl
+  hosts: all
+  roles:
+  - tools-setup
+  
+- name: Generate Kubernetes certificates
+  hosts: localhost
+  roles:
+  - generating
+
+- name: Delegate Kubernetes certificates
+  hosts: all
+  roles:
+  - delegating
+
+- name: Bootstrap ETCD cluster on masters
+  hosts: masters
+  roles:
+  - etcd-bootstrap
+
+- name: Bootstrap Kube CP
+  hosts: masters
+  roles:
+  - control-plane-bootstrap
+
+- name: Botstrap API LB
+  hosts: api-lb
+  roles:
+  - api-load-balancer
+
+- name: Bootstrap worker nodes
+  hosts: workers
+  roles:
+  - workers-bootstrap

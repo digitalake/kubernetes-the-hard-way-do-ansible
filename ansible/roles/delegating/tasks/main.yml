@@ -1,0 +1,57 @@
+---
+- name: Copy certificates and private keys to worker instances
+  ansible.builtin.copy:
+    src: "/tmp/certificates/{{ item }}"
+    dest: "/home/{{ ansible_user }}/"
+    mode: 0600
+  loop:
+    - ca.pem
+    - "{{ inventory_hostname }}.pem"
+    - "{{ inventory_hostname }}-key.pem"
+  when: inventory_hostname in groups['workers']
+
+- name: Copy certificates and private keys to master instances
+  ansible.builtin.copy:
+    src: "/tmp/certificates/{{ item }}"
+    dest: "/home/{{ ansible_user }}/"
+    mode: 0600
+  loop:
+    - ca.pem
+    - ca-key.pem 
+    - kubernetes-key.pem 
+    - kubernetes.pem 
+    - service-account-key.pem 
+    - service-account.pem
+  when: inventory_hostname in groups['masters']
+
+- name: Copy kubelet and kube-proxy kubeconfig files to worker instances
+  ansible.builtin.copy:
+    src: "/tmp/certificates/{{ item }}"
+    dest: "/home/{{ ansible_user }}/"
+    mode: 0600
+  loop:
+    - "{{ inventory_hostname }}.kubeconfig"
+    - kube-proxy.kubeconfig
+  when: inventory_hostname in groups['workers']
+
+- name: Copy kube-controller-manager and kube-scheduler kubeconfig files controller instances
+  ansible.builtin.copy:
+    src: "/tmp/certificates/{{ item }}"
+    dest: "/home/{{ ansible_user }}/"
+    mode: 0600
+  loop:
+    - admin.kubeconfig
+    - kube-controller-manager.kubeconfig
+    - kube-scheduler.kubeconfig
+  when: inventory_hostname in groups['masters']
+
+- name: Copy the encryption-config.yaml encryption config file to each controller instance
+  ansible.builtin.copy:
+    src: "/tmp/certificates/encryption-config.yaml"
+    dest: "/home/{{ ansible_user }}/"
+    mode: 0600
+  when: inventory_hostname in groups['masters']
+
+
+
+

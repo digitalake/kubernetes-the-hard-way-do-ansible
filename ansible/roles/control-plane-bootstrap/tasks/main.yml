@@ -1,0 +1,125 @@
+---
+# tasks file for control-plane-bootstrap
+- name: Create Kubernetes directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - /var/lib/kubernetes/
+    - /etc/kubernetes/config
+  become: yes
+
+- name: Download the official Kubernetes release binaries
+  ansible.builtin.get_url:
+    url: "{{ item }}"
+    dest: /usr/local/bin/
+    mode: '0755'
+  loop:
+    - "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetesVersion }}/bin/linux/amd64/kube-apiserver" 
+    - "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetesVersion }}/bin/linux/amd64/kube-controller-manager" 
+    - "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetesVersion }}/bin/linux/amd64/kube-scheduler" 
+    - "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetesVersion }}/bin/linux/amd64/kubectl"
+  become: yes
+
+- name: Copy certs, keys and configs to kubernetes directory
+  ansible.builtin.copy:
+    src: /home/{{ ansible_user }}/{{ item }}
+    dest: /var/lib/kubernetes/
+    remote_src: yes
+  loop:
+    - ca.pem
+    - ca-key.pem
+    - kubernetes-key.pem
+    - kubernetes.pem
+    - service-account-key.pem
+    - service-account.pem
+    - encryption-config.yaml
+    - kube-controller-manager.kubeconfig
+    - kube-scheduler.kubeconfig
+  become: yes
+
+- name: Set fact for master URLs
+  ansible.builtin.set_fact:
+    master_urls: "{% for host in groups['masters'] %}https://{{ hostvars[host]['ansible_host_private'] }}:2379{% if not loop.last %},{% endif %}{% endfor %}"
+
+- name: Set fact for the count of masters
+  ansible.builtin.set_fact:
+    master_count: "{{ groups['masters'] | length }}"
+
+- name: Create the kube-apiserver.service systemd unit file
+  ansible.builtin.template:
+    src: kube-apiserver.service.j2
+    dest: /etc/systemd/system/kube-apiserver.service
+  become: yes
+
+- name: Create the kube-controller-manager.service systemd unit file
+  ansible.builtin.template:
+    src: kube-controller-manager.service.j2
+    dest: /etc/systemd/system/kube-controller-manager.service
+  become: yes
+
+- name: Create the kube-scheduler.yaml configuration file
+  ansible.builtin.template:
+    src: kube-scheduler.yaml.j2
+    dest: /etc/kubernetes/config/kube-scheduler.yaml
+  become: yes
+
+- name: Create the kube-scheduler.service systemd unit file
+  ansible.builtin.template:
+    src: kube-scheduler.service.j2
+    dest: /etc/systemd/system/kube-scheduler.service
+  become: yes
+
+- name: Reload systemd manager configuration
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Enable kube-apiserver kube-controller-manager kube-scheduler services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: yes
+  loop:
+    - kube-apiserver
+    - kube-controller-manager 
+    - kube-scheduler
+  become: yes
+
+
+- name: Start kube-apiserver kube-controller-manager kube-scheduler services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+  loop:
+    - kube-apiserver
+    - kube-controller-manager 
+    - kube-scheduler
+  become: yes
+
+- name: Include nginx-proxy task
+  include_tasks: nginx-proxy.yml
+  tags: nginx
+
+- name: Include install-modules task
+  include_tasks: install-modules.yml
+  tags: cluster-role
+
+- name: Apply kube-apiserver-to-kubelet ClusterRole and ClusterRoleBinding
+  kubernetes.core.k8s:
+    state: present
+    template:
+      - path: kube-apiserver-to-kubelet-cluster-role.yaml.j2
+      - path: kube-apiserver-to-kubelet-cluster-role-binding.yaml.j2
+    kubeconfig: admin.kubeconfig
+  tags: cluster-role
+
+- name: Include configure-hosts task
+  include_tasks: configure-hosts.yml
+  tags: etc_hosts
+
+
+
+ 
+
+  

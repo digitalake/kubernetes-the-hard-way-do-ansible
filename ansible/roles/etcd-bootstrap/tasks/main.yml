@@ -1,0 +1,90 @@
+---
+# tasks file for roles/etcd-bootstrap
+- name: Create binary temporary directory
+  ansible.builtin.file:
+    path: /tmp/binary
+    state: directory
+
+- name: Download ETCD binary
+  ansible.builtin.get_url:
+    url: "{{ etcdBinaryURL }}"
+    dest: /tmp/binary/etcd.tar.gz
+
+- name: Unarchive ETCD archive
+  ansible.builtin.unarchive:
+    src: /tmp/binary/etcd.tar.gz
+    dest: /tmp/binary/
+    remote_src: yes
+    extra_opts: [--strip-components=1]
+
+- name: Copy etcd and etcdctl binary to /usr/local/bin
+  ansible.builtin.copy:
+    src: /tmp/binary/{{ item }}
+    dest: /usr/local/bin/{{ item }}
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - etcd
+    - etcdctl
+  become: yes
+
+- name: Create directories for ETCD
+  ansible.builtin.file:
+    path: /etc/etcd
+    state: directory
+  become: yes
+
+- name: Create directories for ETCD
+  ansible.builtin.file:
+    path: /var/lib/etcd
+    state: directory
+    mode: '700'
+  become: yes
+
+- name: Copy certs and keys to etcd directory
+  ansible.builtin.copy:
+    src: /home/{{ ansible_user }}/{{ item }}
+    dest: /etc/etcd/{{ item }}
+    remote_src: yes
+  loop:
+    - ca.pem 
+    - kubernetes-key.pem
+    - kubernetes.pem
+  become: yes
+
+#- name: Clean up etcd directory
+#  ansible.builtin.file:
+#    path: /tmp/etcd
+#    state: absent
+#    recurse: yes
+
+- name: Set fact for master URLs
+  ansible.builtin.set_fact:
+    master_urls: "{% for host in groups['masters'] %}{{ hostvars[host]['inventory_hostname'] }}=https://{{ hostvars[host]['ansible_host_private'] }}:2380{% if not loop.last %},{% endif %}{% endfor %}"
+
+- name: Create the etcd.service systemd unit file
+  ansible.builtin.template:
+    src: etcd.service.j2
+    dest: /etc/systemd/system/etcd.service
+  become: yes
+
+- name: Reload systemd manager configuration
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Enable the etcd service
+  ansible.builtin.systemd:
+    name: etcd
+    enabled: yes
+  become: yes
+
+
+- name: Start the etcd service
+  ansible.builtin.systemd:
+    name: etcd
+    state: started
+  become: yes
+
+
+

@@ -1,0 +1,3 @@
+---
+# vars file for roles/etcd-bootstrap
+etcdBinaryURL: "https://github.com/etcd-io/etcd/releases/download/v3.4.15/etcd-v3.4.15-linux-amd64.tar.gz"

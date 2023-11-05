@@ -1,0 +1,245 @@
+---
+# tasks file for workers-bootstrap
+- name: Update apt package cache
+  ansible.builtin.apt:
+    update_cache: yes
+  become: yes
+
+- name: Install the OS dependencies
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - socat
+    - conntrack
+    - ipset
+  become: yes
+
+- name: Disable swap for current session
+  command: swapoff -a
+  become: true
+
+
+- name: Create Kubernetes directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - /etc/cni/net.d
+    - /opt/cni/bin
+    - /var/lib/kubelet
+    - /var/lib/kube-proxy
+    - /var/lib/kubernetes
+    - /var/run/kubernetes
+    - /etc/containerd
+  become: yes
+
+- name: Download kubectl kube-proxy kubelet binary
+  ansible.builtin.get_url:
+    url: "{{ item }}"
+    dest: /usr/local/bin/
+    mode: '0755'
+  loop:
+    - "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetesVersion }}/bin/linux/amd64/kubectl"
+    - "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetesVersion }}/bin/linux/amd64/kube-proxy"
+    - "https://storage.googleapis.com/kubernetes-release/release/{{ kubernetesVersion }}/bin/linux/amd64/kubelet"
+  become: yes
+
+- name: Download runc binary
+  ansible.builtin.get_url:
+    url: "https://github.com/opencontainers/runc/releases/download/{{ runcVersion }}/runc.amd64"
+    dest: /usr/local/bin/runc
+    mode: '0755'
+  become: yes
+
+- name: Create temporary directory for archives
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - /tmp/kubebinaries/
+  become: yes
+
+- name: Download crictl containerd cni-plugins archives
+  ansible.builtin.get_url:
+    url: "{{ item }}"
+    dest: /tmp/kubebinaries/
+  loop:
+    - "https://github.com/kubernetes-sigs/cri-tools/releases/download/{{ crictlVersion }}/crictl-{{ crictlVersion }}-linux-amd64.tar.gz"
+    - "https://github.com/containernetworking/plugins/releases/download/{{ cniPluginsVerion }}/cni-plugins-linux-amd64-{{ cniPluginsVerion }}.tgz"
+    - "https://github.com/containerd/containerd/releases/download/v{{ containerdVersion }}/containerd-{{ containerdVersion }}-linux-amd64.tar.gz"
+  become: yes
+
+- name: Unarchive crictl archive
+  ansible.builtin.unarchive:
+    src: /tmp/kubebinaries/crictl-{{ crictlVersion }}-linux-amd64.tar.gz
+    dest: /tmp/kubebinaries/
+    remote_src: yes
+#    extra_opts: [--strip-components=1]
+  become: yes
+
+- name: Unarchive containerd archive
+  ansible.builtin.unarchive:
+    src: /tmp/kubebinaries/containerd-{{ containerdVersion }}-linux-amd64.tar.gz
+    dest: /tmp/kubebinaries/
+    remote_src: yes
+#    extra_opts: [--strip-components=1]
+  become: yes
+
+- name: Unarchive cni-plugins archive directly to /opt/cni/bin/
+  ansible.builtin.unarchive:
+    src: /tmp/kubebinaries/cni-plugins-linux-amd64-{{ cniPluginsVerion }}.tgz
+    dest: /opt/cni/bin/
+    remote_src: yes
+    extra_opts: [--strip-components=1]
+  become: yes
+
+- name: Copy crictl binary to /usr/local/bin/
+  ansible.builtin.copy:
+    src: /tmp/kubebinaries/crictl
+    dest: /usr/local/bin/
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Copy containerd binaries to /bin/
+  ansible.builtin.copy:
+    src: /tmp/kubebinaries/bin/
+    dest: /bin/
+    remote_src: yes
+  become: yes
+
+- name: Set worker index for maping pod CIDRS
+  set_fact:
+    cidr_index: "{{ groups.workers.index(inventory_hostname) | int + 1 }}"
+  tags: routes
+
+
+- name: Create the bridge network configuration file
+  ansible.builtin.template:
+    src: 10-bridge.conf.j2
+    dest: /etc/cni/net.d/10-bridge.conf
+  become: yes
+
+- name: Create the loopback network configuration file
+  ansible.builtin.template:
+    src: 99-loopback.conf.j2
+    dest: /etc/cni/net.d/99-loopback.conf
+  become: yes
+
+- name: Create the containerd configuration file
+  ansible.builtin.template:
+    src: config.toml.j2
+    dest: /etc/containerd/config.toml
+  become: yes
+
+- name: Create the containerd configuration file
+  ansible.builtin.template:
+    src: containerd.service.j2
+    dest: /etc/systemd/system/containerd.service
+  become: yes
+
+- name: Copy certificate and key for kubelet
+  ansible.builtin.copy:
+    src: /home/{{ ansible_user }}/{{ item }}
+    dest: /var/lib/kubelet/{{ item }}
+    remote_src: yes
+  loop:
+    - "{{ inventory_hostname }}-key.pem"
+    - "{{ inventory_hostname }}.pem"
+  become: yes
+
+- name: Copy certificate and key for kubelet
+  ansible.builtin.copy:
+    src: /home/{{ ansible_user }}/{{ item }}
+    dest: /var/lib/kubelet/{{ item }}
+    remote_src: yes
+  loop:
+    - "{{ inventory_hostname }}-key.pem"
+    - "{{ inventory_hostname }}.pem"
+  become: yes
+
+- name: Copy kubeconfig config for kubelet
+  ansible.builtin.copy:
+    src: /home/{{ ansible_user }}/{{ inventory_hostname }}.kubeconfig
+    dest: /var/lib/kubelet/kubeconfig
+    remote_src: yes
+  become: yes
+
+- name: Copy certificate authority file to /var/lib/kubernetes/
+  ansible.builtin.copy:
+    src: /home/{{ ansible_user }}/ca.pem
+    dest: /var/lib/kubernetes/
+    remote_src: yes
+  become: yes
+
+- name: Create the kubelet configuration file
+  ansible.builtin.template:
+    src: kubelet-config.yaml.j2
+    dest: /var/lib/kubelet/kubelet-config.yaml
+  become: yes
+
+- name: Create the kubelet systemd unit file
+  ansible.builtin.template:
+    src: kubelet.service.j2
+    dest: /etc/systemd/system/kubelet.service
+  become: yes
+
+- name: Copy kube-proxy kubeconfig to kubeproxy directory
+  ansible.builtin.copy:
+    src: /home/{{ ansible_user }}/kube-proxy.kubeconfig
+    dest: /var/lib/kube-proxy/kubeconfig
+    remote_src: yes
+  become: yes
+
+- name: Create the kube-proxy-config.yaml configuration file
+  ansible.builtin.template:
+    src: kube-proxy-config.yaml.j2
+    dest: /var/lib/kube-proxy/kube-proxy-config.yaml
+  become: yes
+
+- name: Create the kube-proxy.service systemd unit file
+  ansible.builtin.template:
+    src: kube-proxy.service.j2
+    dest: /etc/systemd/system/kube-proxy.service
+  become: yes
+
+- name: Reload systemd manager configuration
+  ansible.builtin.systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Enable containerd kubelet kube-proxy services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: yes
+  loop:
+    - containerd
+    - kubelet
+    - kube-proxy
+  become: yes
+
+- name: Start containerd kubelet kube-proxy services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+  loop:
+    - containerd
+    - kubelet
+    - kube-proxy
+  become: yes
+
+- name: Include add-routes task
+  include_tasks: add-routes.yml
+  tags: routes
+
+
+
+
+
+
+
+
+

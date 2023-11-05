@@ -1,0 +1,25 @@
+---
+- name: Create certificates directory
+  ansible.builtin.file:
+    path: /tmp/certificates
+    state: directory
+
+- name: Copy CA and CSR jsons to certificates directory
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/tmp/certificates/{{ item }}"
+  loop:
+    - admin-csr.json
+    - ca-config.json
+    - ca-csr.json
+    - kube-controller-manager-csr.json
+    - kube-proxy-csr.json
+    - kubernetes-csr.json
+    - kube-scheduler-csr.json
+    - service-account-csr.json
+
+- name: Generate worker CSR files
+  ansible.builtin.template:
+    src: worker-csr.json.j2
+    dest: "/tmp/certificates/{{ item }}-csr.json"
+  loop: "{{ groups['workers'] }}"

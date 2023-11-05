@@ -1,0 +1,22 @@
+---
+# tasks file for tools_setup
+#- name: Download cfssl
+#  ansible.builtin.get_url:
+#    url: https://pkg.cfssl.org/R1.2/cfssl_linux-amd64
+#    dest: /usr/local/bin/cfssl
+#    mode: '0755'
+#  become: yes
+#
+#- name: Download cfssl json
+#  ansible.builtin.get_url:
+#    url: https://pkg.cfssl.org/R1.2/cfssljson_linux-amd64
+#    dest: /usr/local/bin/cfssljson
+#    mode: '0755'
+#  become: yes
+
+- name: Install Kubectl
+  ansible.builtin.get_url:
+    url: https://storage.googleapis.com/kubernetes-release/release/v{{ kubectlVersion }}/bin/darwin/amd64/kubectl
+    dest: /usr/local/bin/kubectl
+    mode: '0755'
+  become: yes

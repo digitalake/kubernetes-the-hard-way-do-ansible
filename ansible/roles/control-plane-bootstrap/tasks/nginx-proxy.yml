@@ -1,0 +1,43 @@
+---
+- name: Update apt package cache
+  ansible.builtin.apt:
+    update_cache: yes
+  become: yes
+  tags: nginx
+
+- name: Install the NginX to handle HTTP health checks
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+  become: yes
+  tags: nginx
+
+- name: Create the NginX config
+  ansible.builtin.template:
+    src: kubernetes.default.svc.cluster.local.j2
+    dest: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+  become: yes
+  tags: nginx
+
+- name: Create a symbolic link for kubernetes.default.svc.cluster.local
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/kubernetes.default.svc.cluster.local
+    dest: /etc/nginx/sites-enabled/kubernetes.default.svc.cluster.local
+    state: link
+  become: yes
+  tags: nginx
+
+
+- name: Restart nginx service
+  ansible.builtin.systemd:
+    name: nginx
+    state: restarted
+  become: yes
+  tags: nginx
+
+- name: Enable nginx service
+  ansible.builtin.systemd:
+    name: nginx
+    enabled: yes
+  become: yes
+  tags: nginx

@@ -1,0 +1,9 @@
+---
+- name: Generate an encryption key
+  set_fact:
+    encryption_key: "{{ lookup('community.general.random_string', length=32) | b64encode }}"
+
+- name: Generate encryption-config.yaml encryption config file
+  ansible.builtin.template:
+    src: encryption-config.yaml.j2
+    dest: "/tmp/certificates/encryption-config.yaml"

@@ -1,0 +1,9 @@
+---
+- name: Add workers to /etc/hosts for masters
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item]['ansible_host_private'] }} {{ hostvars[item]['inventory_hostname'] }}  # Added by Ansible"
+    create: yes
+  become: yes
+  loop: "{{ groups['workers'] }}"
+  tags: etc_hosts

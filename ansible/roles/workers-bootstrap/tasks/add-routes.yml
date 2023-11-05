@@ -1,0 +1,13 @@
+- name: Generate route configuration script
+  template:
+    src: routes.sh.j2
+    dest: /home/{{ ansible_user }}/routes.sh
+    mode: '0755'
+  vars:
+    cidr_index: "{{ cidr_index }}"
+  tags: routes
+
+- name: Execute routes adding script
+  ansible.builtin.shell: /home/{{ ansible_user }}/routes.sh
+  become: yes
+  tags: routes

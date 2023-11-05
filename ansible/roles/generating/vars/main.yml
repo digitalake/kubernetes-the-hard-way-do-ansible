@@ -1,0 +1,3 @@
+---
+# vars file for kube-certificates
+k8sHostnames: kubernetes,kubernetes.default,kubernetes.default.svc,kubernetes.default.svc.cluster,kubernetes.svc.cluster.local

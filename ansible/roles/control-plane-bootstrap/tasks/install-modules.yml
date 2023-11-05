@@ -1,0 +1,16 @@
+---
+- name: Make sure pip is installed
+  apt:
+    name: python3-pip
+    state: present
+  become: yes
+  tags: cluster-role
+
+- name: Install required Python packages
+  ansible.builtin.pip:
+    name:
+      - kubernetes
+      - PyYAML
+      - jsonpatch
+    state: present
+  tags: cluster-role

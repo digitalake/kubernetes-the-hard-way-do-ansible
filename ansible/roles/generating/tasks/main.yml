@@ -1,0 +1,100 @@
+---
+# tasks file for kube-certificates
+- name: Include prepare-certconfs task
+  include_tasks: prepare-certconfs.yml
+
+- name: Generate the CA configuration file, certificate, and private key
+  ansible.builtin.shell: cfssl gencert -initca ca-csr.json | cfssljson -bare ca
+  args:
+    chdir: /tmp/certificates
+
+- name: Generate the admin client certificate and private key
+  ansible.builtin.shell: >
+    cfssl gencert \
+    -ca=ca.pem \
+    -ca-key=ca-key.pem \
+    -config=ca-config.json \
+    -profile=kubernetes \
+    admin-csr.json | cfssljson -bare admin
+  args:
+    chdir: /tmp/certificates
+
+- name: Generate a certificate and private key for each Kubernetes worker node
+  ansible.builtin.shell: >
+    cfssl gencert \
+    -ca=ca.pem \
+    -ca-key=ca-key.pem \
+    -config=ca-config.json \
+    -hostname={{ item }},{{ hostvars[item].ansible_host }},{{ hostvars[item].ansible_host_private }} \
+    -profile=kubernetes \
+    {{ item }}-csr.json | cfssljson -bare {{ item }}
+  loop: "{{ groups['workers'] }}"
+  args:
+    chdir: /tmp/certificates
+
+- name: Generate the kube-controller-manager client certificate and private key
+  ansible.builtin.shell: >
+    cfssl gencert \
+    -ca=ca.pem \
+    -ca-key=ca-key.pem \
+    -config=ca-config.json \
+    -profile=kubernetes \
+    kube-controller-manager-csr.json | cfssljson -bare kube-controller-manager
+  args:
+    chdir: /tmp/certificates
+
+- name: Generate the kube-proxy client certificate and private key
+  ansible.builtin.shell: >
+    cfssl gencert \
+    -ca=ca.pem \
+    -ca-key=ca-key.pem \
+    -config=ca-config.json \
+    -profile=kubernetes \
+    kube-proxy-csr.json | cfssljson -bare kube-proxy
+  args:
+    chdir: /tmp/certificates
+
+- name: Generate the kube-scheduler client certificate and private key
+  ansible.builtin.shell: >
+    cfssl gencert \
+    -ca=ca.pem \
+    -ca-key=ca-key.pem \
+    -config=ca-config.json \
+    -profile=kubernetes \
+    kube-scheduler-csr.json | cfssljson -bare kube-scheduler
+  args:
+    chdir: /tmp/certificates
+
+
+- name: Set masters private IPs
+  set_fact:
+    masters_private_ips: "{{ groups['masters'] | map('extract', hostvars, 'ansible_host_private') | join(',') }}"
+
+- name: Generate the Kubernetes API Server certificate and private key
+  ansible.builtin.shell: >
+    cfssl gencert \
+    -ca=ca.pem \
+    -ca-key=ca-key.pem \
+    -config=ca-config.json \
+    -hostname=10.32.0.1,{{ masters_private_ips }},{{ lb_api_ipv4 }},127.0.0.1,{{ k8sHostnames }} \
+    -profile=kubernetes \
+    kubernetes-csr.json | cfssljson -bare kubernetes
+  args:
+    chdir: /tmp/certificates
+
+- name: Generate the service-account certificate and private key
+  ansible.builtin.shell: >
+    cfssl gencert \
+    -ca=ca.pem \
+    -ca-key=ca-key.pem \
+    -config=ca-config.json \
+    -profile=kubernetes \
+    service-account-csr.json | cfssljson -bare service-account
+  args:
+    chdir: /tmp/certificates
+
+- name: Include generate-kubeconfigs task
+  include_tasks: generate-kubeconfigs.yml
+
+- name: Include generate-enc-key task
+  include_tasks: generate-enc-key.yml

@@ -1,0 +1,38 @@
+---
+# tasks file for api-load-balancer
+- name: Update apt package cache
+  ansible.builtin.apt:
+    update_cache: yes
+  become: yes
+  tags: nginx
+
+- name: Install the NginX to balance the KubeAPI requests
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+  become: yes
+  tags: nginx
+
+- name: Create tcpconf.d directory for NginX
+  ansible.builtin.file:
+    path: /etc/nginx/tcpconf.d
+    state: directory
+    recurse: yes
+  become: yes
+
+- name: Add line to the end of a file
+  ansible.builtin.lineinfile:
+    path: /etc/nginx/nginx.conf
+    line: "include /etc/nginx/tcpconf.d/*;"
+    insertafter: EOF
+  become: yes
+
+- name: Create the load balancer nginx config file
+  ansible.builtin.template:
+    src: kubernetes.conf.j2
+    dest: /etc/nginx/tcpconf.d/kubernetes.conf
+  become: yes
+
+- name: Reload nginx
+  ansible.builtin.command: nginx -s reload
+  become: yes

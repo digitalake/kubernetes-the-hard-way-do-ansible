@@ -1,0 +1,15 @@
+[masters]
+%{ for master in masters ~}
+${master.name} ansible_host=${master.ipv4_address} ansible_user=${master.user} ansible_host_private=${master.private_ipv4_address}
+%{ endfor ~}
+
+[workers]
+%{ for worker in workers ~}
+${worker.name} ansible_host=${worker.ipv4_address} ansible_user=${worker.user} ansible_host_private=${worker.private_ipv4_address}
+%{ endfor ~}
+
+[api-lb]
+${lb_name} ansible_host=${lb_ipv4_address} ansible_user=${lb_user} ansible_host_private=${lb_private_ipv4_address}
+
+[all:vars]
+lb_api_ipv4=${lb_static_ipv4_address}

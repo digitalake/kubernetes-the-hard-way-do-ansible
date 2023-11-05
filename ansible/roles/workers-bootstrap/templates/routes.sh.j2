@@ -1,0 +1,6 @@
+#!/bin/bash
+{% for worker in groups['workers'] %}
+{% if worker != inventory_hostname %}
+ip route add 10.200.{{ hostvars[worker].cidr_index }}.0/24 via {{ hostvars[worker].ansible_host_private }}
+{% endif %}
+{% endfor %}
