@@ -118,7 +118,6 @@ This role requires `cfssl`, `cfssljson` and `kubectl` installed on the Ansible c
 `generating` role generates:
 
 - CA configuration file, certificate, and private key
-- certificate and private key for each Kubernetes `worker node` (ansible iterates through the `workers` hosts form the inventory)
 - client `certificate` and `private key` for:
   - `admin`
   - each `worker node` (ansible iterates through the `workers` hosts form the inventory)
@@ -294,8 +293,6 @@ In this role the following Kubernetes binaries are installed:
 - `kubectl`
 - `kube-proxy`
 - `kubelet`
-
-`Containerd` configuration: `config.toml` config 
 
 Also `control-plane-bootstrap` role generates systemd unit files and configurations for the components:
 
